@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.0
+// @version         0.1.1
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -25,6 +25,7 @@ const
     DEBUG = true,
     
     SEARCH_BUTTON_CLASS = SCRIPT_NAME + '-search-button',
+    SEARCHING_CLASS = SCRIPT_NAME + '-searching',
     CSS_STYLE_CLASS = SCRIPT_NAME + '-css-rule',
     
     SEARCH_BUTTON_TEXT = '元記事検索',
@@ -151,7 +152,7 @@ const
             
             self.existing_window = child_window;
             
-            return child_window;
+            return self;
         }
         
         close() {
@@ -159,10 +160,73 @@ const
                 self = this;
             
             if ( ! self.existing_window ) {
-                return;
+                return self;
             }
             
-            self.existing_window.close();
+            try {
+                self.existing_window.close();
+            }
+            catch ( error ) {
+            }
+            self.existing_window = null;
+            
+            return self;
+        }
+    },
+    
+    searching_icon_control = new class {
+        constructor() {
+            const
+                self = this;
+            
+            self.searching_container = null;
+        }
+        
+        create() {
+            const
+                self = this;
+            
+            if ( self.searching_container ) {
+                return self;
+            }
+            
+            const
+                searching_icon_svg = '<svg version="1.1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" fill="none" r="10" stroke-width="4" style="stroke: currentColor; opacity: 0.4;"></circle><path d="M 12,2 a 10 10 -90 0 1 9,5.6" fill="none" stroke="currentColor" stroke-width="4" />',
+                searchin_icon = document.createElement( 'div' ),
+                searching_container = self.searching_container = document.createElement( 'div' );
+            
+            searchin_icon.className = 'icon';
+            searchin_icon.insertAdjacentHTML( 'beforeend', searching_icon_svg );
+            
+            searching_container.className = SEARCHING_CLASS;
+            searching_container.appendChild( searchin_icon );
+            
+            document.documentElement.appendChild( searching_container );
+            return self;
+        }
+        
+        hide() {
+            const
+                self = this;
+            
+            if ( ! self.searching_container ) {
+                return self;
+            }
+            
+            self.searching_container.classList.add( 'hidden' );
+            return self;
+        }
+        
+        show() {
+            const
+                self = this;
+            
+            if ( ! self.searching_container ) {
+                return self;
+            }
+            
+            self.searching_container.classList.remove( 'hidden' );
+            return self;
         }
     },
     
@@ -219,15 +283,13 @@ const
         }
         
         let
-            child_window_control = new ChildWindowControl(),
-            
             button = create_button( {
                 url : readmore_link.href,
                 onclick : ( event ) => {
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    child_window_control.open( readmore_link.href );
+                    new ChildWindowControl().open( readmore_link.href );
                 },
             } );
         
@@ -253,15 +315,13 @@ const
         }
         
         let
-            child_window_control = new ChildWindowControl(),
-            
             button = create_button( {
                 url : search_info.search_url,
                 onclick : ( event ) => {
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    child_window_control.open( search_info.search_url, {
+                    new ChildWindowControl().open( search_info.search_url, {
                         child_call_parameters : {
                             hostname : search_info.hostname,
                             keyword : search_info.keyword,
@@ -277,12 +337,6 @@ const
     
     check_child_article_page = () => {
         log_debug( 'check_child_article_page()' );
-        
-        try {
-            document.body.style.visibility = 'hidden';
-        }
-        catch ( error ) {
-        }
         
         const
             search_info = get_search_info();
@@ -302,13 +356,7 @@ const
         log_debug( 'check_search_page()' );
         
         const
-            query = ( [ ... new URL( location.href ).searchParams ].filter( param => param[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ];
-        
-        if ( ! query ) {
-            return true;
-        }
-        
-        const
+            query = ( [ ... new URL( location.href ).searchParams ].filter( param => param[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '',
             hostname = ( query.match( /^site:([^\s]+)/ ) || [] )[ 1 ];
         
         if ( ! hostname ) {
@@ -335,7 +383,10 @@ const
         if ( ! site_link ) {
             return true;
         }
+        
         location.href = site_link.href;
+        
+        return true;
     },
     
     current_url_object = new URL( location.href ),
@@ -372,7 +423,13 @@ const
         }
         
         if ( /^\/articles\//.test( current_url_object.pathname ) ) {
-            return is_child_page ? check_child_article_page : check_article_page;
+            if ( ! is_child_page ) {
+                return check_article_page;
+            }
+            
+            searching_icon_control.create().show();
+            
+            return check_child_article_page;
         }
         
         if ( /(^www\.)?google\.com/.test( current_url_object.hostname ) && ( current_url_object.pathname == '/search' ) ) {
@@ -381,7 +438,14 @@ const
             }
             catch ( error ) {
             }
-            return is_child_page ? check_search_page : null;
+            
+            if ( ! is_child_page ) {
+                return null;
+            }
+            
+            searching_icon_control.create().show();
+            
+            return check_search_page;
         }
         return null;
     } )();
@@ -404,7 +468,43 @@ const
                 .${SEARCH_BUTTON_CLASS}:hover {
                     text-decoration: underline !important;
                 }
-            `;
+                
+                .${SEARCHING_CLASS} {
+                    position: fixed;
+                    top: 0px;
+                    left: 0px;
+                    z-index: 10000;
+                    width: 100%;
+                    height: 100%;
+                    background: black;
+                    opacity: 0.5;
+                }
+                
+                .${SEARCHING_CLASS} .icon {
+                    position: absolute;
+                    top: 0px;
+                    right: 0px;
+                    bottom: 0px;
+                    left: 0px;
+                    margin: auto;
+                    width: 100px;
+                    height: 100px;
+                    color: #f3a847;
+                }
+                
+                .${SEARCHING_CLASS} .icon svg {
+                    animation: searching 1.5s linear infinite;
+                }
+                
+                @keyframes searching {
+                    0% {transform: rotate(0deg);}
+                    100% {transform: rotate(360deg);}
+                }
+                
+                .${SEARCHING_CLASS} .hidden {
+                    display: none;
+                }
+        `;
         
         let css_style = document.querySelector( '.' + CSS_STYLE_CLASS );
         
@@ -425,7 +525,10 @@ const
             stop_request = check_page();
         }
         finally {
-            if ( ! stop_request ) {
+            if ( stop_request ) {
+                searching_icon_control.hide();
+            }
+            else {
                 start_observe();
             }
         }
@@ -434,6 +537,7 @@ const
     stop_observe = () => observer.disconnect();
 
 insert_css_rule();
+check_page();
 start_observe();
 
 } )();
