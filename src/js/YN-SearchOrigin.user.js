@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.3
+// @version         0.1.4
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -94,6 +94,8 @@ const
     log_error = ( ... args ) => {
         console.error( '%c' + '[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: purple;', ... args );
     },
+    
+    current_url_object = new URL( location.href ),
     
     ChildWindowControl = class {
         constructor( url = null, options = {} ) {
@@ -356,7 +358,7 @@ const
         log_debug( 'check_search_page()' );
         
         const
-            query = ( [ ... new URL( location.href ).searchParams ].filter( param => param[ 0 ] == 'q' )[ 0 ] || [] )[ 1 ] || '',
+            query = current_url_object.searchParams.get( 'q' ) || '',
             hostname = ( query.match( /^site:([^\s]+)/ ) || [] )[ 1 ];
         
         if ( ! hostname ) {
@@ -381,15 +383,15 @@ const
             } )[ 0 ];
         
         if ( ! site_link ) {
-            return true;
+            current_url_object.searchParams.set( 'q', query.replace( /^site:[^\s]+\s*/, '' ) );
+            location.href = current_url_object.href;
+            return;
         }
         
         location.href = site_link.href;
         
         //return true;
     },
-    
-    current_url_object = new URL( location.href ),
     
     child_called_parameters = ( () => {
         if ( ! window.opener ) {
