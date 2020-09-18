@@ -28,5 +28,6 @@
 
 ■ 関連
 ---
-- [Yahoo News Original Finder](https://greasyfork.org/ja/scripts/403843-yahoo-news-original-finder)
-  [既に同様のユーザースクリプトを公開されている方がいらっしゃいました](https://twitter.com/furyutei/status/1306761164764770304)  （[かんたんきかく @kantankikaku](https://twitter.com/kantankikaku) ／[のあ @knoa](https://twitter.com/knoa)様）。こちらはクリック不要で、自動的に元記事へと遷移してくれるようです。  
+[Yahoo News Original Finder](https://greasyfork.org/ja/scripts/403843-yahoo-news-original-finder)
+----
+[既に同様のユーザースクリプトを公開されている方がいらっしゃいました](https://twitter.com/furyutei/status/1306761164764770304)  （[かんたんきかく @kantankikaku](https://twitter.com/kantankikaku) ／[のあ @knoa](https://twitter.com/knoa)様）。こちらはクリック不要で、自動的に元記事へと遷移してくれるようです。  
