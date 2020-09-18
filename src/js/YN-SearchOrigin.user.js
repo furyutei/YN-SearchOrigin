@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.1
+// @version         0.1.2
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -501,7 +501,7 @@ const
                     100% {transform: rotate(360deg);}
                 }
                 
-                .${SEARCHING_CLASS} .hidden {
+                .${SEARCHING_CLASS}.hidden {
                     display: none;
                 }
         `;
