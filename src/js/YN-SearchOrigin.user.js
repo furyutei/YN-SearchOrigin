@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.4
+// @version         0.1.5
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -232,6 +232,15 @@ const
         }
     },
     
+    convert_search_hostname = ( () => {
+        const
+            hostname_map = {
+                'this.kiji.is' : 'www.47news.jp',
+            };
+        
+        return ( hostname ) => hostname_map[ hostname ] || hostname;
+    } )(),
+    
     get_search_info = () => {
         const
             site_link = document.querySelector( 'a[data-ylk="rsec:detail;slk:banner;"]' );
@@ -241,7 +250,7 @@ const
         }
         
         const
-            hostname = new URL( site_link.href ).hostname,
+            hostname = convert_search_hostname( new URL( site_link.href ).hostname ),
             keyword = ( ( document.querySelector( 'main[id="contents"] div[id="contentsWrap"] > article > header > h1' ) || {} ).textContent || ( ( document.querySelector( 'meta[property="og:title"]' ) || {} ).content || document.title ).replace( /([(（].*?[）)])?\s*-[^\-]*$/, '' ) || '' ).trim();
             
         
@@ -435,14 +444,14 @@ const
         }
         
         if ( /(^www\.)?google\.com/.test( current_url_object.hostname ) && ( current_url_object.pathname == '/search' ) ) {
+            if ( ! is_child_page ) {
+                return null;
+            }
+            
             try {
                 window.name = '';
             }
             catch ( error ) {
-            }
-            
-            if ( ! is_child_page ) {
-                return null;
             }
             
             searching_icon_control.create().show();
