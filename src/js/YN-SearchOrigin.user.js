@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.8
+// @version         0.1.9
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -86,7 +86,7 @@ const
     },
     
     log = ( ... args ) => {
-        console.log( '%c[' + SCRIPT_NAME + '] ' +  + get_log_timestamp(), 'color: teal;', ... args );
+        console.log( '%c[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: teal;', ... args );
     },
     
     log_info = ( ... args ) => {
@@ -99,7 +99,86 @@ const
     
     current_url_object = new URL( location.href ),
     
-    ChildWindowControl = class {
+    WindowNameStorage = class {
+        constructor( target_window, storage_name ) {
+            const
+                self = this;
+            
+            self.init( target_window, storage_name );
+        }
+        
+        init( target_window, storage_name ) {
+            const
+                self = this;
+            
+            Object.assign( self, {
+                target_window,
+                storage_name,
+            } );
+            
+            return self;
+        }
+        
+        get value() {
+            const
+                self = this,
+                target_window = self.target_window,
+                storage_name = self.storage_name;
+            
+            if ( ( ! target_window ) || ( ! storage_name ) ) {
+                return {};
+            }
+            
+            try {
+                return JSON.parse( target_window.name )[ storage_name ] || {};
+            }
+            catch ( error ) {
+                return {};
+            }
+        }
+        
+        set value( spec_value ) {
+            this.target_window.name = this.get_name( spec_value );
+        }
+        
+        get_name( spec_value ) {
+            const
+                self = this,
+                target_window = self.target_window,
+                storage_name = self.storage_name;
+            
+            let original_name_params = {};
+            
+            if ( target_window ) {
+                try {
+                    original_name_params = JSON.parse( target_window.name );
+                    if ( ! ( original_name_params instanceof Object ) ) {
+                        original_name_params = {};
+                    }
+                }
+                catch ( error ) {
+                    original_name_params = {};
+                }
+            }
+            
+            try {
+                if ( storage_name ) {
+                    if ( spec_value === undefined ) {
+                        delete original_name_params[ storage_name ];
+                    }
+                    else {
+                        original_name_params[ storage_name ] = spec_value;
+                    }
+                }
+                return JSON.stringify( original_name_params );
+            }
+            catch ( error ) {
+                return '';
+            }
+        }
+    },
+    
+    WindowControl = class {
         constructor( url = null, options = {} ) {
             const
                 self = this;
@@ -123,21 +202,7 @@ const
                 options = {};
             }
             
-            let child_window = options.existing_window || self.existing_window,
-                name = '',
-                original_name_params = {};
-            
-            if ( child_window && child_window.name ) {
-                try {
-                    original_name_params = JSON.parse( child_window.name );
-                    if ( ! ( original_name_params instanceof Object ) ) {
-                        original_name_params = {};
-                    }
-                }
-                catch ( error ) {
-                    original_name_params = {};
-                }
-            }
+            let child_window = options.existing_window || self.existing_window;
             
             if ( ! options.child_call_parameters ) {
                 options.child_call_parameters = {};
@@ -149,18 +214,14 @@ const
                     child_window_id : '' + ( new Date().getTime() ) + '-' + ( ++ self.child_window_counter ),
                     transition_complete : false,
                 } );
-                
-                original_name_params[ SCRIPT_NAME ] = options.child_call_parameters;
-                name = JSON.stringify( original_name_params );
             }
             catch ( error ) {
                 log_error( error );
             }
             
             if ( child_window ) {
-                if ( child_window.name != name ) {
-                    child_window.name = name;
-                }
+                new WindowNameStorage( child_window, SCRIPT_NAME ).value = options.child_call_parameters;
+                
                 if ( child_window.location.href != url ) {
                     setTimeout( () => {
                         child_window.location.href = url;
@@ -168,7 +229,8 @@ const
                 }
             }
             else {
-                child_window = window.open( url, name );
+                child_window = window.open( url, new WindowNameStorage( null, SCRIPT_NAME ).get_name( options.child_call_parameters ) );
+                //new WindowNameStorage( child_window, SCRIPT_NAME ).value = options.child_call_parameters;
             }
             
             self.existing_window = child_window;
@@ -197,7 +259,7 @@ const
     
     ModeControl = class {
         constructor() {
-            this.storage_mode_info_name = SCRIPT_NAME + '-mode_info',
+            this.storage_mode_info_name = SCRIPT_NAME + '-mode_info';
             this.load_mode_info();
         }
         
@@ -376,25 +438,7 @@ const
         return button;
     },
     
-    child_called_parameters = ( () => {
-        let child_called_parameters = {},
-            current_url = location.href;
-        
-        try {
-            child_called_parameters = JSON.parse( window.name )[ SCRIPT_NAME ];
-            if ( ( ! child_called_parameters ) || ( child_called_parameters.script_name != SCRIPT_NAME ) ) {
-                return {};
-            }
-        }
-        catch ( error ) {
-            return {};
-        }
-        
-        child_called_parameters.initial_url = current_url;
-        
-        return child_called_parameters;
-    } )(),
-    
+    child_called_parameters = new WindowNameStorage( window, SCRIPT_NAME ).value,
     is_child_page = child_called_parameters.script_name,
     is_auto_transition_page = ! child_called_parameters.transition_complete,
     
@@ -421,7 +465,7 @@ const
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    new ChildWindowControl( readmore_link.href );
+                    new WindowControl( readmore_link.href );
                 },
             } );
         
@@ -430,7 +474,7 @@ const
         readmore_link.after( container );
         
         if ( is_auto_transition_page && mode_control.is_automode ) {
-            new ChildWindowControl( readmore_link.href, {
+            new WindowControl( readmore_link.href, {
                 existing_window : window,
             } );
         }
@@ -463,7 +507,7 @@ const
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    new ChildWindowControl( search_info.search_url, {
+                    new WindowControl( search_info.search_url, {
                         child_call_parameters : {
                             hostname : search_info.hostname,
                             keyword : search_info.keyword,
@@ -477,7 +521,7 @@ const
         search_info.site_link.after( container );
         
         if ( is_auto_transition_page && mode_control.is_automode ) {
-            new ChildWindowControl( search_info.search_url, {
+            new WindowControl( search_info.search_url, {
                 existing_window : window,
                 child_call_parameters : {
                     hostname : search_info.hostname,
@@ -534,15 +578,11 @@ const
                 return false;
             } )[ 0 ];
         
-        try {
-            let original_name_params = JSON.parse( window.name );
-            Object.assign( original_name_params[ SCRIPT_NAME ], {
-                transition_complete : true,
-            } );
-            window.name = JSON.stringify( original_name_params );
-        }
-        catch ( error ) {
-        }
+        let name_storage = new WindowNameStorage( window, SCRIPT_NAME );
+        
+        name_storage.value = Object.assign( name_storage.value, {
+            transition_complete : true,
+        } );
         
         if ( ! site_link ) {
             current_url_object.searchParams.set( 'q', query.replace( /^site:[^\s]+\s*/, '' ) );
@@ -691,13 +731,7 @@ const
     stop_observe = () => observer.disconnect();
 
 document.body.addEventListener( 'click', ( event ) => {
-    try {
-        let original_name_params = JSON.parse( window.name );
-        delete original_name_params[ SCRIPT_NAME ];
-        window.name = JSON.stringify( original_name_params );
-    }
-    catch ( error ) {
-    }
+    new WindowNameStorage( window, SCRIPT_NAME ).value = undefined;
 }, true );
 
 insert_css_rule();
