@@ -3,12 +3,11 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.7
+// @version         0.1.8
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
-// @match           https://news.yahoo.co.jp/articles/*
-// @match           https://news.yahoo.co.jp/pickup/*
+// @match           https://news.yahoo.co.jp/*
 // @match           https://www.google.com/search*
 // @grant           none
 // @compatible      chrome
@@ -22,13 +21,16 @@
 
 const
     SCRIPT_NAME = 'YN-SearchOrigin',
-    DEBUG = true,
+    DEBUG = false,
     
+    CONTROL_CONTAINER_CLASS = SCRIPT_NAME + '-control-container',
     SEARCH_BUTTON_CLASS = SCRIPT_NAME + '-search-button',
+    MODE_SELECTOR_CLASS = SCRIPT_NAME + '-mode-selector',
     SEARCHING_CLASS = SCRIPT_NAME + '-searching',
     CSS_STYLE_CLASS = SCRIPT_NAME + '-css-rule',
     
     SEARCH_BUTTON_TEXT = '元記事検索',
+    MODE_SELECTOR_AUTO_TEXT = '自動',
     
     self = undefined,
     
@@ -80,19 +82,19 @@ const
         if ( ! DEBUG ) {
             return;
         }
-        console.debug( '%c' + '[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: gray;', ... args );
+        console.debug( '%c[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: gray;', ... args );
     },
     
     log = ( ... args ) => {
-        console.log( '%c' + '[' + SCRIPT_NAME + '] ' +  + get_log_timestamp(), 'color: teal;', ... args );
+        console.log( '%c[' + SCRIPT_NAME + '] ' +  + get_log_timestamp(), 'color: teal;', ... args );
     },
     
     log_info = ( ... args ) => {
-        console.info( '%c' +  '[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: darkslateblue;', ... args );
+        console.info( '%c[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: darkslateblue;', ... args );
     },
     
     log_error = ( ... args ) => {
-        console.error( '%c' + '[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: purple;', ... args );
+        console.error( '%c[' + SCRIPT_NAME + '] ' + get_log_timestamp(), 'color: purple;', ... args );
     },
     
     current_url_object = new URL( location.href ),
@@ -121,8 +123,21 @@ const
                 options = {};
             }
             
-            let child_window = self.existing_window,
-                name = '';
+            let child_window = options.existing_window || self.existing_window,
+                name = '',
+                original_name_params = {};
+            
+            if ( child_window && child_window.name ) {
+                try {
+                    original_name_params = JSON.parse( child_window.name );
+                    if ( ! ( original_name_params instanceof Object ) ) {
+                        original_name_params = {};
+                    }
+                }
+                catch ( error ) {
+                    original_name_params = {};
+                }
+            }
             
             if ( ! options.child_call_parameters ) {
                 options.child_call_parameters = {};
@@ -132,8 +147,11 @@ const
                 Object.assign( options.child_call_parameters, {
                     script_name : SCRIPT_NAME,
                     child_window_id : '' + ( new Date().getTime() ) + '-' + ( ++ self.child_window_counter ),
+                    transition_complete : false,
                 } );
-                name = JSON.stringify( options.child_call_parameters );
+                
+                original_name_params[ SCRIPT_NAME ] = options.child_call_parameters;
+                name = JSON.stringify( original_name_params );
             }
             catch ( error ) {
                 log_error( error );
@@ -144,8 +162,9 @@ const
                     child_window.name = name;
                 }
                 if ( child_window.location.href != url ) {
-                    //child_window.location.replace( url );
-                    child_window.location.href = url;
+                    setTimeout( () => {
+                        child_window.location.href = url;
+                    }, 0 );
                 }
             }
             else {
@@ -173,6 +192,68 @@ const
             self.existing_window = null;
             
             return self;
+        }
+    },
+    
+    ModeControl = class {
+        constructor() {
+            this.storage_mode_info_name = SCRIPT_NAME + '-mode_info',
+            this.load_mode_info();
+        }
+        
+        load_mode_info() {
+            try {
+                this.mode_info = JSON.parse( localStorage.getItem( this.storage_mode_info_name ) );
+            }
+            catch ( error ) {
+            }
+            
+            if ( ! this.mode_info ) {
+                this.mode_info = {};
+            }
+            
+            if ( Object.keys( this.mode_info ).length <= 0 ) {
+                this.mode_info = {
+                    is_automode : false,
+                };
+            }
+        }
+        
+        save_mode_info() {
+            localStorage.setItem( this.storage_mode_info_name, JSON.stringify( this.mode_info ) );
+        }
+        
+        get is_automode() {
+            return this.mode_info.is_automode;
+        }
+        
+        set is_automode( specified_mode ) {
+            this.mode_info.is_automode = !! specified_mode;
+            this.save_mode_info();
+        }
+        
+        create_control_element() {
+            const
+                self = this,
+                control_element = document.createElement( 'label' ),
+                automode_checkbox = document.createElement( 'input' );
+            
+            
+            control_element.className = MODE_SELECTOR_CLASS;
+            control_element.textContent = MODE_SELECTOR_AUTO_TEXT;
+            
+            automode_checkbox.type = 'checkbox';
+            automode_checkbox.checked = self.is_automode;
+            
+            automode_checkbox.addEventListener( 'change', ( event ) => {
+                event.stopPropagation();
+                event.preventDefault();
+                self.is_automode = automode_checkbox.checked;
+            } );
+            
+            control_element.firstChild.before( automode_checkbox );
+            
+            return control_element;
         }
     },
     
@@ -239,7 +320,7 @@ const
             };
         
         return ( ( site_link ) => {
-            let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} )[ 'alt' ],
+            let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} ).alt,
                 hostname = image_alt_to_hostname_map[ image_alt ] || new URL( site_link.href ).hostname;
             
             return hostname;
@@ -266,6 +347,18 @@ const
         };
     },
     
+    create_control_container = ( parameters ) => {
+        if ( ! parameters ) {
+            parameters = {};
+        }
+        
+        let container = document.createElement( 'div' );
+        
+        container.className = CONTROL_CONTAINER_CLASS;
+        
+        return container;
+    },
+    
     create_button = ( parameters ) => {
         if ( ! parameters ) {
             parameters = {};
@@ -283,6 +376,28 @@ const
         return button;
     },
     
+    child_called_parameters = ( () => {
+        let child_called_parameters = {},
+            current_url = location.href;
+        
+        try {
+            child_called_parameters = JSON.parse( window.name )[ SCRIPT_NAME ];
+            if ( ( ! child_called_parameters ) || ( child_called_parameters.script_name != SCRIPT_NAME ) ) {
+                return {};
+            }
+        }
+        catch ( error ) {
+            return {};
+        }
+        
+        child_called_parameters.initial_url = current_url;
+        
+        return child_called_parameters;
+    } )(),
+    
+    is_child_page = child_called_parameters.script_name,
+    is_auto_transition_page = ! child_called_parameters.transition_complete,
+    
     check_pickup_page = () => {
         log_debug( 'check_pickup_page()' );
         
@@ -298,17 +413,27 @@ const
         }
         
         let
+            container = create_control_container(),
+            mode_control = new ModeControl(),
             button = create_button( {
                 url : readmore_link.href,
                 onclick : ( event ) => {
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    new ChildWindowControl().open( readmore_link.href );
+                    new ChildWindowControl( readmore_link.href );
                 },
             } );
         
-        readmore_link.after( button );
+        container.appendChild( button );
+        button.after( mode_control.create_control_element() );
+        readmore_link.after( container );
+        
+        if ( is_auto_transition_page && mode_control.is_automode ) {
+            new ChildWindowControl( readmore_link.href, {
+                existing_window : window,
+            } );
+        }
         
         return true;
     },
@@ -330,13 +455,15 @@ const
         }
         
         let
+            container = create_control_container(),
+            mode_control = new ModeControl(),
             button = create_button( {
                 url : search_info.search_url,
                 onclick : ( event ) => {
                     event.stopPropagation();
                     event.preventDefault();
                     
-                    new ChildWindowControl().open( search_info.search_url, {
+                    new ChildWindowControl( search_info.search_url, {
                         child_call_parameters : {
                             hostname : search_info.hostname,
                             keyword : search_info.keyword,
@@ -345,7 +472,19 @@ const
                 },
             } );
         
-        search_info.site_link.after( button );
+        container.appendChild( button );
+        button.after( mode_control.create_control_element() );
+        search_info.site_link.after( container );
+        
+        if ( is_auto_transition_page && mode_control.is_automode ) {
+            new ChildWindowControl( search_info.search_url, {
+                existing_window : window,
+                child_call_parameters : {
+                    hostname : search_info.hostname,
+                    keyword : search_info.keyword,
+                },
+            } );
+        }
         
         return true;
     },
@@ -395,6 +534,16 @@ const
                 return false;
             } )[ 0 ];
         
+        try {
+            let original_name_params = JSON.parse( window.name );
+            Object.assign( original_name_params[ SCRIPT_NAME ], {
+                transition_complete : true,
+            } );
+            window.name = JSON.stringify( original_name_params );
+        }
+        catch ( error ) {
+        }
+        
         if ( ! site_link ) {
             current_url_object.searchParams.set( 'q', query.replace( /^site:[^\s]+\s*/, '' ) );
             location.href = current_url_object.href;
@@ -406,50 +555,19 @@ const
         //return true;
     },
     
-    child_called_parameters = ( () => {
-        try {
-            if ( ! window.opener ) {
-                return {};
-            }
-        }
-        catch ( error ) {
-            log_info( 'child_called_parameters() error:', error );
-        }
-        
-        let child_called_parameters = {},
-            current_url = location.href;
-        
-        try {
-            child_called_parameters = JSON.parse( window.name );
-            
-            if ( ( ! child_called_parameters ) || ( child_called_parameters.script_name != SCRIPT_NAME ) ) {
-                return {};
-            }
-        }
-        catch ( error ) {
-            return {};
-        }
-        
-        child_called_parameters.initial_url = current_url;
-        
-        return child_called_parameters;
-    } )(),
-    
-    is_child_page = !! child_called_parameters.script_name,
-    
     check_page = ( () => {
         if ( /^\/pickup\//.test( current_url_object.pathname ) ) {
             return check_pickup_page;
         }
         
         if ( /^\/articles\//.test( current_url_object.pathname ) ) {
-            if ( ! is_child_page ) {
+            if ( is_child_page && is_auto_transition_page ) {
+                searching_icon_control.create().show();
+                return check_child_article_page;
+            }
+            else {
                 return check_article_page;
             }
-            
-            searching_icon_control.create().show();
-            
-            return check_child_article_page;
         }
         
         if ( /(^www\.)?google\.com/.test( current_url_object.hostname ) && ( current_url_object.pathname == '/search' ) ) {
@@ -457,10 +575,8 @@ const
                 return null;
             }
             
-            try {
-                window.name = '';
-            }
-            catch ( error ) {
+            if ( ! is_auto_transition_page ) {
+                return null;
             }
             
             searching_icon_control.create().show();
@@ -478,7 +594,14 @@ const
     insert_css_rule = () => {
         const
             css_rule_text = `
+                .${CONTROL_CONTAINER_CLASS} {
+                    background: lightblue !important;
+                    text-align: center;
+                }
+                
                 .${SEARCH_BUTTON_CLASS} {
+                    display: inline-block !important;
+                    margin: auto 8px !important;
                     text-align: center !important;
                     font-weight: bolder !important;
                     color: navy !important;
@@ -487,6 +610,17 @@ const
                 
                 .${SEARCH_BUTTON_CLASS}:hover {
                     text-decoration: underline !important;
+                }
+                
+                .${MODE_SELECTOR_CLASS} {
+                    display: inline-block !important;
+                    cursor: pointer;
+                    font-size: 12px;
+                    font-weight: bolder;
+                }
+                
+                .${MODE_SELECTOR_CLASS} > input {
+                    margin-right: 6px;
                 }
                 
                 .${SEARCHING_CLASS} {
@@ -555,6 +689,16 @@ const
     } ),
     start_observe = () => observer.observe( document.body, { childList : true, subtree : true } ),
     stop_observe = () => observer.disconnect();
+
+document.body.addEventListener( 'click', ( event ) => {
+    try {
+        let original_name_params = JSON.parse( window.name );
+        delete original_name_params[ SCRIPT_NAME ];
+        window.name = JSON.stringify( original_name_params );
+    }
+    catch ( error ) {
+    }
+}, true );
 
 insert_css_rule();
 start_observe();
