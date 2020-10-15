@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.9
+// @version         0.1.10
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -22,6 +22,11 @@
 const
     SCRIPT_NAME = 'YN-SearchOrigin',
     DEBUG = false,
+    
+    IMAGE_ALT_TO_HOSTNAME_MAP = {
+        '47NEWS' : 'www.47news.jp',
+        'テレビ朝日系（ANN）' : 'news.tv-asahi.co.jp',
+    },
     
     CONTROL_CONTAINER_CLASS = SCRIPT_NAME + '-control-container',
     SEARCH_BUTTON_CLASS = SCRIPT_NAME + '-search-button',
@@ -375,19 +380,12 @@ const
         }
     },
     
-    get_search_hostname = ( () => {
-        const
-            image_alt_to_hostname_map = {
-                '47NEWS' : 'www.47news.jp',
-            };
+    get_search_hostname = ( site_link ) => {
+        let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} ).alt,
+            hostname = IMAGE_ALT_TO_HOSTNAME_MAP[ image_alt ] || new URL( site_link.href ).hostname;
         
-        return ( ( site_link ) => {
-            let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} ).alt,
-                hostname = image_alt_to_hostname_map[ image_alt ] || new URL( site_link.href ).hostname;
-            
-            return hostname;
-        } );
-    } )(),
+        return hostname;
+    },
     
     get_search_info = () => {
         const
