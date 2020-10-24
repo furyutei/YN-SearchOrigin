@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.10
+// @version         0.1.11
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -23,10 +23,11 @@ const
     SCRIPT_NAME = 'YN-SearchOrigin',
     DEBUG = false,
     
-    IMAGE_ALT_TO_HOSTNAME_MAP = {
+    IMAGE_ALT_TO_HOSTNAME_MAP = Object.assign( Object.create( null ), {
         '47NEWS' : 'www.47news.jp',
         'テレビ朝日系（ANN）' : 'news.tv-asahi.co.jp',
-    },
+        'THE PAGE' : null,
+    } ),
     
     CONTROL_CONTAINER_CLASS = SCRIPT_NAME + '-control-container',
     SEARCH_BUTTON_CLASS = SCRIPT_NAME + '-search-button',
@@ -382,7 +383,11 @@ const
     
     get_search_hostname = ( site_link ) => {
         let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} ).alt,
-            hostname = IMAGE_ALT_TO_HOSTNAME_MAP[ image_alt ] || new URL( site_link.href ).hostname;
+            hostname = ( image_alt in IMAGE_ALT_TO_HOSTNAME_MAP ) ? IMAGE_ALT_TO_HOSTNAME_MAP[ image_alt ] : new URL( site_link.href ).hostname;
+        
+        if ( hostname == 'news.yahoo.co.jp' ) {
+            return null;
+        }
         
         return hostname;
     },
@@ -396,7 +401,13 @@ const
         }
         
         const
-            hostname = get_search_hostname( site_link ),
+            hostname = get_search_hostname( site_link );
+        
+        if ( ! hostname ) {
+            return null;
+        }
+        
+        const
             keyword = ( ( document.querySelector( 'main[id="contents"] div[id="contentsWrap"] > article > header > h1' ) || {} ).textContent || ( ( document.querySelector( 'meta[property="og:title"]' ) || {} ).content || document.title ).replace( /([(（].*?[）)])?\s*-[^\-]*$/, '' ) || '' ).trim();
         
         return {
