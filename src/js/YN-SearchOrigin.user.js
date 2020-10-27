@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.11
+// @version         0.1.12
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -24,9 +24,16 @@ const
     DEBUG = false,
     
     IMAGE_ALT_TO_HOSTNAME_MAP = Object.assign( Object.create( null ), {
+        'THE PAGE' : null,
         '47NEWS' : 'www.47news.jp',
         'テレビ朝日系（ANN）' : 'news.tv-asahi.co.jp',
-        'THE PAGE' : null,
+        'Impress Watch' : 'watch.impress.co.jp',
+    } ),
+    
+    HOSTNAME_TO_VALID_HOSTNAME_MAP = Object.assign( Object.create( null ), {
+        'news.yahoo.co.jp' : null,
+        'www.watch.impress.co.jp' : 'watch.impress.co.jp',
+        'japanese.yonhapnews.co.kr' : 'jp.yna.co.kr',
     } ),
     
     CONTROL_CONTAINER_CLASS = SCRIPT_NAME + '-control-container',
@@ -385,8 +392,12 @@ const
         let image_alt = ( site_link.querySelector( 'img[alt]' ) || {} ).alt,
             hostname = ( image_alt in IMAGE_ALT_TO_HOSTNAME_MAP ) ? IMAGE_ALT_TO_HOSTNAME_MAP[ image_alt ] : new URL( site_link.href ).hostname;
         
-        if ( hostname == 'news.yahoo.co.jp' ) {
-            return null;
+        if ( hostname ) {
+            hostname = hostname.replace( /^www\./, '' );
+        }
+        
+        if ( hostname && ( hostname in HOSTNAME_TO_VALID_HOSTNAME_MAP ) ) {
+            hostname = HOSTNAME_TO_VALID_HOSTNAME_MAP[ hostname ];
         }
         
         return hostname;
@@ -574,13 +585,13 @@ const
             site_link = [ ... document.querySelectorAll( '#rso > .g > .rc > div > a' ) ].filter( link => {
                 let url_object = new URL( link.href, location.href );
                 
-                if ( url_object.hostname == hostname ) {
+                if ( url_object.hostname.slice( - hostname.length ) == hostname ) {
                     return true;
                 }
                 
                 let url = ( [ ... url_object.searchParams ].filter( param => param[ 0 ] == 'url' )[ 0 ] || [] )[ 1 ];
                 
-                if ( url && ( new URL( url ).hosname == hostname ) ) {
+                if ( url && ( new URL( url ).hosname.slice( - hostname.length ) == hostname ) ) {
                     return true;
                 }
                 
