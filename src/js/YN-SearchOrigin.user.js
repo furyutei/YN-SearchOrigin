@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.12
+// @version         0.1.13
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -44,6 +44,8 @@ const
     
     SEARCH_BUTTON_TEXT = '元記事検索',
     MODE_SELECTOR_AUTO_TEXT = '自動',
+    
+    PAGE_TRANSITION_DELAY = 300, // TODO: Chromeで、ページ遷移までの時間が短すぎると(?) history に記録されない場合がある模様→止むをえず、遅延させている
     
     self = undefined,
     
@@ -238,7 +240,7 @@ const
                 if ( child_window.location.href != url ) {
                     setTimeout( () => {
                         child_window.location.href = url;
-                    }, 0 );
+                    }, PAGE_TRANSITION_DELAY );
                 }
             }
             else {
@@ -473,7 +475,7 @@ const
             readmore_link = document.querySelector( '[data-ylk^="rsec:tpc_main;slk:headline;pos:"]' );
         
         if ( ! readmore_link ) {
-            return;
+            return false;
         }
         
         let
@@ -515,7 +517,7 @@ const
         log_debug( 'search_info', search_info );
         
         if ( ! search_info ) {
-            return;
+            return false;
         }
         
         let
@@ -562,12 +564,14 @@ const
         log_debug( 'search_info', search_info );
         
         if ( ! search_info ) {
-            return;
+            return false;
         }
         
-        location.href = search_info.search_url;
+        setTimeout( () => {
+            location.href = search_info.search_url;
+        }, PAGE_TRANSITION_DELAY );
         
-        //return true;
+        return false;
     },
     
     check_search_page = () => {
@@ -582,7 +586,7 @@ const
         }
         
         const
-            site_link = [ ... document.querySelectorAll( '#rso > .g > .rc > div > a' ) ].filter( link => {
+            site_link = [ ... document.querySelectorAll( '#rso .g > .rc > div > a' ) ].filter( link => {
                 let url_object = new URL( link.href, location.href );
                 
                 if ( url_object.hostname.slice( - hostname.length ) == hostname ) {
@@ -606,13 +610,17 @@ const
         
         if ( ! site_link ) {
             current_url_object.searchParams.set( 'q', query.replace( /^site:[^\s]+\s*/, '' ) );
-            location.href = current_url_object.href;
-            return;
+            setTimeout( () => {
+                location.href = current_url_object.href;
+            }, PAGE_TRANSITION_DELAY );
+            return false;
         }
         
-        location.href = site_link.href;
+        setTimeout( () => {
+            location.href = site_link.href;
+        }, PAGE_TRANSITION_DELAY );
         
-        //return true;
+        return false;
     },
     
     check_page = ( () => {
