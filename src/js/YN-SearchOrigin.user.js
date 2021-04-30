@@ -3,7 +3,7 @@
 // @name:ja         Yahoo!ニュースの元記事を探す
 // @namespace       https://furyutei.work
 // @license         MIT
-// @version         0.1.14
+// @version         0.1.15
 // @description     Find the original article of the article of Yahoo News Japan.
 // @description:ja  Yahoo!ニュースの記事の、元となった記事探しを助けます
 // @author          furyu
@@ -45,7 +45,7 @@ const
     SEARCH_BUTTON_TEXT = '元記事検索',
     MODE_SELECTOR_AUTO_TEXT = '自動',
     
-    PAGE_TRANSITION_DELAY = 300, // TODO: Chromeで、ページ遷移までの時間が短すぎると(?) history に記録されない場合がある模様→止むをえず、遅延させている
+    PAGE_TRANSITION_DELAY = 800, // TODO: Chromeで、ページ遷移までの時間が短すぎると(?) history に記録されない場合がある模様→止むをえず、遅延させている
     
     self = undefined,
     
@@ -579,7 +579,7 @@ const
         
         const
             query = current_url_object.searchParams.get( 'q' ) || '',
-            hostname = ( query.match( /^site:([^\s]+)/ ) || [] )[ 1 ];
+            hostname = ( query.match( /(?:^|\s)site:([^\s]+)/ ) || [] )[ 1 ];
         
         if ( ! hostname ) {
             return true;
@@ -609,7 +609,7 @@ const
         } );
         
         if ( ! site_link ) {
-            current_url_object.searchParams.set( 'q', query.replace( /^site:[^\s]+\s*/, '' ) );
+            current_url_object.searchParams.set( 'q', query.replace( /(^|\s)site:[^\s]+/, '$1-site:news.yahoo.co.jp' ) );
             setTimeout( () => {
                 location.href = current_url_object.href;
             }, PAGE_TRANSITION_DELAY );
